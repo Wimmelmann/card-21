@@ -1,6 +1,6 @@
 # 21 / Agurk
 
-En første GitHub-klar prototype af kortspillet **21**, også kendt som **Agurk**.
+En GitHub-klar prototype af kortspillet **21**, også kendt som **Agurk**.
 
 ## Regler i appen
 
@@ -15,7 +15,20 @@ En første GitHub-klar prototype af kortspillet **21**, også kendt som **Agurk*
 - Hvis flere spillere har samme højeste sidste kort, taber de alle og får strafpoint.
 - Taberkortets fulde værdi gives som strafpoint.
 - Taberkortets værdi bestemmer kortantal i næste runde, dog max 10 kort.
-- Når en spiller kommer over 21 point, er spillet slut.
+- Det gælder om **ikke** at få point.
+- Kommer en spiller over 21 point, har spilleren tabt.
+- Rammer en spiller præcis 21 point, nulstilles pointbunken til 0.
+
+## Taktik i denne version
+
+Den simple computer-AI spiller ikke længere kun laveste lovlige kort. Den forsøger nu også at:
+
+- gemme lave kort til slutningen,
+- komme af med farlige høje kort tæt på slutningen,
+- bruge knægt/dame/konge til at presse næste spiller,
+- spille laveste kort der kan stikke, når der ikke er en god taktisk grund til at spille højere.
+
+AI'en er stadig enkel og kan forbedres senere.
 
 ## Sådan kører du appen lokalt
 
@@ -35,7 +48,8 @@ En første GitHub-klar prototype af kortspillet **21**, også kendt som **Agurk*
 
 ## Næste mulige features
 
-- Bedre AI-strategi.
+- Sværhedsgrader for AI.
+- Bedre visning af hvorfor AI vælger et kort.
 - Mobiloptimeret kort-animation.
 - Gem spil i browseren.
 - Online multiplayer med gamecode.

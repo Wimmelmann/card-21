@@ -200,12 +200,52 @@ function canPlayCard(player, card) {
 
 function chooseRecommendedCard(player) {
   const playable = getPlayableCards(player).sort(sortCards);
-  if (state.currentHighestValue === null) return playable[0];
+  if (playable.length === 0) return null;
 
-  const beatingCards = playable.filter(card => card.value >= state.currentHighestValue);
-  if (beatingCards.length > 0) return beatingCards[0];
+  const handSize = player.hand.length;
+  const lowest = playable[0];
+  const highest = playable[playable.length - 1];
+  const lowCards = player.hand.filter(card => card.value <= 5).length;
+  const highCards = player.hand.filter(card => card.value >= 11).sort(sortCards);
+  const nextPlayer = state.players[(state.currentPlayerIndex + 1) % state.players.length];
+  const endgame = handSize <= 3;
 
-  return playable[0];
+  // Starter man et stik tæt på slutningen, er det ofte klogt at smide et farligt højt kort
+  // så man kan gemme et lavere kort til sidste afgørelse.
+  if (state.currentHighestValue === null) {
+    if (handSize === 1) return player.hand[0];
+    if (endgame && highCards.length > 0 && lowCards > 0) return highCards[highCards.length - 1];
+    if (endgame) return highest;
+    if (highCards.length >= 2 && lowCards >= 2) return highCards[0];
+    return lowest;
+  }
+
+  const beatingCards = playable.filter(card => card.value >= state.currentHighestValue).sort(sortCards);
+
+  // Hvis man ikke kan stikke, er reglen tvungen: smid laveste kort.
+  if (beatingCards.length === 0) return lowest;
+
+  const lowestBeating = beatingCards[0];
+  const pressureCards = beatingCards.filter(card => card.value >= 11).sort(sortCards);
+  const canApplyPressure = pressureCards.length > 0
+    && state.currentHighestValue <= 11
+    && nextPlayer
+    && (nextPlayer.hand.length <= 3 || nextPlayer.score >= 12 || handSize <= 4);
+
+  // Taktik: spil højt for at presse næste spiller, især hvis næste spiller er presset
+  // på kortantal/point, eller vi selv nærmer os slutningen af runden.
+  if (canApplyPressure) {
+    return pressureCards[0];
+  }
+
+  // Sidst i runden skal man helst af med høje kort, hvis man stadig kan gøre det lovligt.
+  if (endgame && highCards.length > 0) {
+    const dangerousPlayable = beatingCards.filter(card => card.value >= 10).sort(sortCards);
+    if (dangerousPlayable.length > 0) return dangerousPlayable[dangerousPlayable.length - 1];
+  }
+
+  // Standard: brug laveste kort, der kan stikke, for at spare stærkere kort.
+  return lowestBeating;
 }
 
 function playCard(playerId, cardId) {
@@ -294,14 +334,25 @@ function finishRound() {
   const highestValue = Math.max(...finalEntries.map(entry => entry.card.value));
   const losers = finalEntries.filter(entry => entry.card.value === highestValue);
 
+  const resetPlayers = [];
+
   for (const entry of losers) {
     const player = state.players.find(p => p.id === entry.playerId);
     player.score += entry.card.value;
     player.lastPenaltyCard = entry.card;
+
+    if (player.score === state.pointLimit) {
+      player.score = 0;
+      resetPlayers.push(player.name);
+    }
   }
 
   const loserNames = losers.map(entry => playerName(entry.playerId)).join(', ');
   addLog(`${loserNames} taber runden med ${valueName(highestValue)} og får ${highestValue} strafpoint.`, true);
+
+  if (resetPlayers.length > 0) {
+    addLog(`${resetPlayers.join(', ')} rammer præcis ${state.pointLimit} og nulstiller pointbunken til 0.`, true);
+  }
 
   state.cardsPerPlayer = Math.min(highestValue, 10);
   const busted = state.players.filter(player => player.score > state.pointLimit);
@@ -356,8 +407,8 @@ function renderScores() {
         <strong>${escapeHtml(player.name)}</strong>
         <span>${player.type === 'ai' ? 'Computer' : 'Spiller'}</span>
       </div>
-      <div>${player.score} / ${state.pointLimit + 1} point</div>
-      <span>${player.hand.length} kort på hånden</span>
+      <div>${player.score} point</div>
+      <span>${player.hand.length} kort på hånden · over ${state.pointLimit} taber</span>
     `;
     els.scoreList.appendChild(div);
   }
