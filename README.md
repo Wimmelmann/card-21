@@ -2,7 +2,7 @@
 
 En GitHub-klar prototype af kortspillet **21**, også kendt som **Agurk**.
 
-Version: v3
+Version: v5
 
 ## Regler i appen
 
@@ -10,9 +10,14 @@ Version: v3
 - Første runde gives 7 kort til hver spiller.
 - Es er lavest, konge er højest.
 - Kulør har ingen betydning.
-- Næste spiller skal lægge samme eller højere kort, hvis muligt.
-- Kan spilleren ikke stikke, skal spilleren smide sit laveste kort.
-- Når alle sidder med ét kort tilbage, afgør sidste kort runden.
+- Alle spillere spiller deres kort i én fælles bunke.
+- Det er altid det **øverste kort i bunken**, der skal matches eller stikkes.
+- Næste spiller skal lægge samme eller højere kort end øverste kort, hvis det er muligt.
+- Kan spilleren ikke matche/stikke, skal spilleren smide sit laveste kort.
+- Når en spiller smider et lavt kort, bliver det kort det nye øverste kort, og næste spiller skal kun matche/stikke det nye øverste kort.
+- Eksempel: Spiller 1 lægger 8. Spiller 2 kan ikke stikke og lægger 2. Spiller 3 skal nu kun lægge 2 eller højere.
+- En runde varer fra kortgivning til sidste kort – ikke kun én rundgang af spillere.
+- Når alle sidder med ét kort tilbage, spilles sidste kort, og sidste kort afgør runden.
 - Højeste sidste kort taber.
 - Hvis flere spillere har samme højeste sidste kort, taber de alle og får strafpoint.
 - Taberkortets fulde værdi gives som strafpoint.
@@ -21,18 +26,26 @@ Version: v3
 - Kommer en spiller over 21 point, har spilleren tabt.
 - Rammer en spiller præcis 21 point, nulstilles pointbunken til 0.
 
+## Rettet i v5
+
+- Appen bruger nu én løbende fælles bunke gennem hele runden.
+- Kravet for næste spiller er nu altid det senest spillede/øverste kort, ikke højeste kort tidligere i runden.
+- Hvis en spiller ikke kan stikke og smider fx en 2'er, skal næste spiller kun matche/stikke 2'eren.
+- UI er ændret fra “Skal stikkes” til “Øverste kort”.
+- Regelvinduet og spilloggen er opdateret til den nye bunke-logik.
+
 ## Taktik i denne version
 
-Den simple computer-AI spiller ikke længere kun laveste lovlige kort. Den forsøger nu også at:
+Den simple computer-AI forsøger at:
 
 - beskytte esser meget hårdt og kun smide dem frivilligt, hvis der ikke er andre lovlige valg,
 - gemme lave kort til slutningen,
-- åbne stik med mellem-kort frem for esser,
+- åbne bunken med mellem-kort frem for esser,
 - komme af med farlige høje kort tæt på slutningen,
 - bruge knægt/dame/konge til at presse næste spiller,
-- spille laveste kort der kan stikke, når der ikke er en god taktisk grund til at spille højere.
+- spille laveste kort der kan matche/stikke, når der ikke er en god taktisk grund til at spille højere.
 
-AI'en er stadig enkel og kan forbedres senere, men den bør nu ikke længere åbne eller stikke med es, medmindre den er tvunget eller kun har es tilbage.
+AI'en er stadig enkel og kan forbedres senere.
 
 ## Sådan kører du appen lokalt
 

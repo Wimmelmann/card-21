@@ -28,9 +28,10 @@ const state = {
   cardsPerPlayer: 7,
   pointLimit: 21,
   currentPlayerIndex: 0,
-  trickStarterIndex: 0,
-  trickCards: [],
-  currentHighestValue: null,
+  roundStarterIndex: 0,
+  pileCards: [],
+  topCardValue: null,
+  finalPhase: false,
   awaitingContinue: false,
   gameOver: false,
 };
@@ -119,9 +120,10 @@ function startGame() {
   state.roundNumber = 1;
   state.cardsPerPlayer = 7;
   state.currentPlayerIndex = 0;
-  state.trickStarterIndex = 0;
+  state.roundStarterIndex = 0;
   state.gameOver = false;
   state.awaitingContinue = false;
+  state.finalPhase = false;
   clearLog();
   addLog('Spillet er startet. Første runde spilles med 7 kort.', true);
 
@@ -137,16 +139,22 @@ function resetToSetup() {
 
 function startRound() {
   state.deck = shuffle(createDeck());
-  state.trickCards = [];
-  state.currentHighestValue = null;
+  state.pileCards = [];
+  state.topCardValue = null;
+  state.finalPhase = state.cardsPerPlayer === 1;
   state.awaitingContinue = false;
 
   for (const player of state.players) {
     player.hand = state.deck.splice(0, state.cardsPerPlayer).sort(sortCards);
   }
 
-  state.currentPlayerIndex = state.trickStarterIndex % state.players.length;
-  addLog(`Runde ${state.roundNumber}: Alle får ${state.cardsPerPlayer} kort.`, true);
+  state.currentPlayerIndex = state.roundStarterIndex % state.players.length;
+  addLog(`Runde ${state.roundNumber}: Alle får ${state.cardsPerPlayer} kort. Alle kort spilles i én fælles bunke. Man skal kun matche eller stikke det øverste kort.`, true);
+
+  if (state.finalPhase) {
+    addLog('Alle har kun ét kort. Denne runde afgøres direkte på sidste kort.', true);
+  }
+
   render();
   maybeAutoPlay();
 }
@@ -185,10 +193,10 @@ function currentPlayer() {
 }
 
 function getPlayableCards(player) {
-  if (state.currentHighestValue === null) return [...player.hand];
+  if (state.topCardValue === null) return [...player.hand];
 
-  const beatingCards = player.hand.filter(card => card.value >= state.currentHighestValue);
-  if (beatingCards.length > 0) return beatingCards;
+  const matchingOrHigherCards = player.hand.filter(card => card.value >= state.topCardValue);
+  if (matchingOrHigherCards.length > 0) return matchingOrHigherCards;
 
   const lowestValue = Math.min(...player.hand.map(card => card.value));
   return player.hand.filter(card => card.value === lowestValue);
@@ -204,27 +212,21 @@ function chooseRecommendedCard(player) {
 
   const handSize = player.hand.length;
   const lowest = playable[0];
-  const highest = playable[playable.length - 1];
   const lowCards = player.hand.filter(card => card.value <= 5).length;
   const highCards = player.hand.filter(card => card.value >= 11).sort(sortCards);
   const nextPlayer = state.players[(state.currentPlayerIndex + 1) % state.players.length];
   const endgame = handSize <= 3;
   const nonAces = playable.filter(card => card.value > 1).sort(sortCards);
-
-  // Esser er guld i Agurk. AI'en må kun frivilligt bruge et es,
-  // hvis den ikke har andre lovlige kort. Ellers gemmes esset til slut.
   const lowestNonAce = nonAces[0] || lowest;
 
-  // Starter man et stik, skal AI'en især undgå at åbne med es.
-  // Den spiller hellere et mellem/højt kort og prøver at gemme de helt lave kort.
-  if (state.currentHighestValue === null) {
+  // Første kort i bunken: AI'en skal især undgå at åbne med es.
+  if (state.topCardValue === null) {
     if (handSize === 1) return player.hand[0];
 
     const middleCards = playable.filter(card => card.value >= 6 && card.value <= 10).sort(sortCards);
     const nonProtectedCards = playable.filter(card => card.value >= 6).sort(sortCards);
     const smallButNotAce = playable.filter(card => card.value > 1 && card.value <= 5).sort(sortCards);
 
-    // Tæt på slutningen: kom af med farlige kort og gem lave kort til sidste afgørelse.
     if (endgame) {
       const dangerousCards = playable.filter(card => card.value >= 10).sort(sortCards);
       if (dangerousCards.length > 0 && lowCards > 0) return dangerousCards[dangerousCards.length - 1];
@@ -232,49 +234,40 @@ function chooseRecommendedCard(player) {
       return lowest;
     }
 
-    // Tidligt/midt i runden: brug et mellem-kort først, hvis muligt.
     if (middleCards.length > 0) return middleCards[0];
-
-    // Har AI'en flere høje kort og samtidig lave kort i reserve, må den smide ét højt kort.
     if (highCards.length >= 2 && lowCards >= 2) return highCards[0];
-
-    // Ellers vælg laveste ikke-beskyttede kort. Es spilles kun, hvis det er eneste mulighed.
     if (nonProtectedCards.length > 0) return nonProtectedCards[0];
     if (smallButNotAce.length > 0) return smallButNotAce[smallButNotAce.length - 1];
     return lowestNonAce;
   }
 
-  const beatingCards = playable.filter(card => card.value >= state.currentHighestValue).sort(sortCards);
+  const matchingOrHigherCards = player.hand.filter(card => card.value >= state.topCardValue).sort(sortCards);
 
-  // Hvis man ikke kan stikke, er reglen tvungen: smid laveste kort.
-  // Det er den eneste situation, hvor AI'en gerne må smide es frivilligt-lignende.
-  if (beatingCards.length === 0) return lowest;
+  // Hvis AI'en ikke kan matche/stikke øverste kort, er reglen tvungen: smid laveste kort.
+  // Det sænker samtidig kravet for næste spiller, fordi kortet lægges øverst i bunken.
+  if (matchingOrHigherCards.length === 0) return lowest;
 
-  // Kan AI'en stikke uden at bruge es, vælger den aldrig es.
-  const nonAceBeatingCards = beatingCards.filter(card => card.value > 1).sort(sortCards);
-  const safeBeatingCards = nonAceBeatingCards.length > 0 ? nonAceBeatingCards : beatingCards;
-  const lowestBeating = safeBeatingCards[0];
-  const pressureCards = safeBeatingCards.filter(card => card.value >= 11).sort(sortCards);
+  // Kan AI'en spille uden at bruge es, vælger den aldrig es frivilligt.
+  const nonAceOptions = matchingOrHigherCards.filter(card => card.value > 1).sort(sortCards);
+  const safeOptions = nonAceOptions.length > 0 ? nonAceOptions : matchingOrHigherCards;
+  const lowestLegal = safeOptions[0];
+  const pressureCards = safeOptions.filter(card => card.value >= 11).sort(sortCards);
   const canApplyPressure = pressureCards.length > 0
-    && state.currentHighestValue <= 11
+    && state.topCardValue <= 11
     && nextPlayer
     && (nextPlayer.hand.length <= 3 || nextPlayer.score >= 12 || handSize <= 4);
 
-  // Taktik: spil højt for at presse næste spiller, især hvis næste spiller er presset
-  // på kortantal/point, eller vi selv nærmer os slutningen af runden.
-  if (canApplyPressure) {
-    return pressureCards[0];
-  }
+  // Pres næste spiller med højt kort, når det giver mening.
+  if (canApplyPressure) return pressureCards[0];
 
-  // Sidst i runden skal man helst af med høje kort, hvis man stadig kan gøre det lovligt.
+  // Tæt på slutningen: kom af med farlige høje kort, hvis man stadig har lave kort i reserve.
   if (endgame && highCards.length > 0) {
-    const dangerousPlayable = safeBeatingCards.filter(card => card.value >= 10).sort(sortCards);
-    if (dangerousPlayable.length > 0) return dangerousPlayable[dangerousPlayable.length - 1];
+    const dangerousPlayable = safeOptions.filter(card => card.value >= 10).sort(sortCards);
+    if (dangerousPlayable.length > 0 && lowCards > 0) return dangerousPlayable[dangerousPlayable.length - 1];
   }
 
-  // Standard: brug laveste ikke-es, der kan stikke, for at spare de stærkere kort
-  // og samtidig beskytte de allermindste kort til slutningen.
-  return lowestBeating;
+  // Standard: læg laveste lovlige ikke-es.
+  return lowestLegal;
 }
 
 function playCard(playerId, cardId) {
@@ -287,17 +280,25 @@ function playCard(playerId, cardId) {
   const card = player.hand[cardIndex];
   if (!canPlayCard(player, card)) return;
 
+  const wasFinalCard = player.hand.length === 1;
   player.hand.splice(cardIndex, 1);
-  state.trickCards.push({ playerId: player.id, card });
+  state.pileCards.push({ playerId: player.id, card, wasFinalCard });
+  state.topCardValue = card.value;
 
-  if (state.currentHighestValue === null || card.value >= state.currentHighestValue) {
-    state.currentHighestValue = card.value;
+  const prefix = wasFinalCard ? 'sidste kort' : 'kort';
+  addLog(`${player.name} lægger ${cardName(card)} som ${prefix}. Øverste kort er nu ${valueName(card.value)}.`);
+
+  if (state.players.every(p => p.hand.length === 0)) {
+    finishRound();
+    return;
   }
 
-  addLog(`${player.name} lægger ${cardName(card)}.`);
-
-  if (state.trickCards.length === state.players.length) {
-    finishTrick();
+  if (!state.finalPhase && state.players.every(p => p.hand.length === 1)) {
+    state.finalPhase = true;
+    state.awaitingContinue = true;
+    state.currentPlayerIndex = nextPlayerWithCards((state.currentPlayerIndex + 1) % state.players.length);
+    render();
+    addLog('Nu sidder alle med ét kort tilbage. Fortsæt for at spille sidste kort og afgøre runden.', true);
     return;
   }
 
@@ -306,63 +307,39 @@ function playCard(playerId, cardId) {
   maybeAutoPlay();
 }
 
-function finishTrick() {
-  const highestValue = Math.max(...state.trickCards.map(entry => entry.card.value));
-  const firstHighest = state.trickCards.find(entry => entry.card.value === highestValue);
-  state.trickStarterIndex = state.players.findIndex(player => player.id === firstHighest.playerId);
-
-  addLog(`Stikket er færdigt. ${playerName(firstHighest.playerId)} starter næste stik med ${valueName(highestValue)}.`, true);
-
-  const cardsLeft = state.players[0].hand.length;
-  if (cardsLeft === 1) {
-    state.awaitingContinue = true;
-    render();
-    addLog('Nu sidder alle med ét kort tilbage. Næste kort afgør runden.', true);
-    return;
-  }
-
-  if (cardsLeft === 0) {
-    finishRound();
-    return;
-  }
-
-  state.trickCards = [];
-  state.currentHighestValue = null;
-  state.currentPlayerIndex = state.trickStarterIndex;
-  state.awaitingContinue = true;
-  render();
-}
-
 function continueAfterPause() {
   if (state.gameOver) {
     resetToSetup();
     return;
   }
 
-  state.awaitingContinue = false;
-
   const allHandsEmpty = state.players.every(player => player.hand.length === 0);
-  if (allHandsEmpty && state.trickCards.length === 0) {
+  if (allHandsEmpty && state.pileCards.length === 0) {
     startRound();
     return;
   }
 
-  const cardsLeft = state.players[0].hand.length;
-  if (state.trickCards.length === state.players.length && cardsLeft > 0) {
-    state.trickCards = [];
-    state.currentHighestValue = null;
-    state.currentPlayerIndex = state.trickStarterIndex;
-  }
-
+  state.awaitingContinue = false;
+  state.currentPlayerIndex = nextPlayerWithCards(state.currentPlayerIndex);
   render();
   maybeAutoPlay();
 }
 
+function nextPlayerWithCards(startIndex) {
+  if (state.players.every(player => player.hand.length === 0)) return startIndex;
+
+  let index = startIndex % state.players.length;
+  for (let i = 0; i < state.players.length; i++) {
+    if (state.players[index].hand.length > 0) return index;
+    index = (index + 1) % state.players.length;
+  }
+  return startIndex;
+}
+
 function finishRound() {
-  const finalEntries = state.trickCards;
+  const finalEntries = state.pileCards.filter(entry => entry.wasFinalCard);
   const highestValue = Math.max(...finalEntries.map(entry => entry.card.value));
   const losers = finalEntries.filter(entry => entry.card.value === highestValue);
-
   const resetPlayers = [];
 
   for (const entry of losers) {
@@ -376,7 +353,12 @@ function finishRound() {
     }
   }
 
+  const finalSummary = finalEntries
+    .map(entry => `${playerName(entry.playerId)}: ${cardName(entry.card)}`)
+    .join(' · ');
   const loserNames = losers.map(entry => playerName(entry.playerId)).join(', ');
+
+  addLog(`Sidste kort: ${finalSummary}.`, true);
   addLog(`${loserNames} taber runden med ${valueName(highestValue)} og får ${highestValue} strafpoint.`, true);
 
   if (resetPlayers.length > 0) {
@@ -384,6 +366,7 @@ function finishRound() {
   }
 
   state.cardsPerPlayer = Math.min(highestValue, 10);
+  state.roundStarterIndex = state.players.findIndex(player => player.id === losers[0].playerId);
   const busted = state.players.filter(player => player.score > state.pointLimit);
 
   if (busted.length > 0) {
@@ -396,8 +379,9 @@ function finishRound() {
   }
 
   state.roundNumber += 1;
-  state.trickCards = [];
-  state.currentHighestValue = null;
+  state.pileCards = [];
+  state.topCardValue = null;
+  state.finalPhase = false;
   state.awaitingContinue = true;
   render();
 }
@@ -447,34 +431,44 @@ function renderScores() {
 }
 
 function renderTable() {
-  els.roundLabel.textContent = `Runde ${state.roundNumber}`;
+  els.roundLabel.textContent = `Runde ${state.roundNumber} · Bunke ${state.pileCards.length} kort`;
 
   if (state.gameOver) {
     els.turnTitle.textContent = 'Spillet er slut';
     els.turnHint.textContent = 'Tryk Nyt spil for at starte igen.';
   } else if (state.awaitingContinue) {
-    els.turnTitle.textContent = 'Stik/runde færdig';
-    els.turnHint.textContent = 'Tryk Fortsæt.';
+    const handsEmpty = state.players.every(player => player.hand.length === 0);
+    const oneCardLeft = state.players.every(player => player.hand.length === 1);
+    els.turnTitle.textContent = handsEmpty ? 'Runden er færdig' : oneCardLeft ? 'Sidste kort tilbage' : 'Pause';
+    els.turnHint.textContent = handsEmpty ? 'Tryk Næste runde.' : oneCardLeft ? 'Tryk Fortsæt for at spille sidste kort.' : 'Tryk Fortsæt.';
   } else {
     const player = currentPlayer();
     els.turnTitle.textContent = `${player.name}s tur`;
     els.turnHint.textContent = turnHintFor(player);
   }
 
-  els.currentHighest.textContent = state.currentHighestValue === null ? '-' : valueName(state.currentHighestValue);
+  els.currentHighest.textContent = state.topCardValue === null ? '-' : valueName(state.topCardValue);
   els.trickCards.innerHTML = '';
 
-  if (state.trickCards.length === 0) {
-    els.trickCards.innerHTML = '<p class="hint">Ingen kort på bordet endnu.</p>';
+  if (state.pileCards.length === 0) {
+    els.trickCards.innerHTML = '<p class="hint">Ingen kort i bunken endnu.</p>';
     return;
   }
 
-  for (const entry of state.trickCards) {
+  const cardsToShow = state.pileCards.slice(-16);
+  if (state.pileCards.length > cardsToShow.length) {
+    const hidden = document.createElement('p');
+    hidden.className = 'hint';
+    hidden.textContent = `${state.pileCards.length - cardsToShow.length} tidligere kort er skjult. De nyeste kort vises her.`;
+    els.trickCards.appendChild(hidden);
+  }
+
+  for (const entry of cardsToShow) {
     const wrap = document.createElement('div');
     wrap.appendChild(renderCard(entry.card));
     const owner = document.createElement('span');
     owner.className = 'card-owner';
-    owner.textContent = playerName(entry.playerId);
+    owner.textContent = entry.wasFinalCard ? `${playerName(entry.playerId)} · sidste` : playerName(entry.playerId);
     wrap.querySelector('.playing-card').appendChild(owner);
     els.trickCards.appendChild(wrap);
   }
@@ -529,15 +523,9 @@ function renderControls() {
 }
 
 function nextContinueText() {
-  if (state.trickCards.length === state.players.length && state.players[0].hand.length === 0) {
-    return 'Næste runde';
-  }
-  if (state.trickCards.length === 0 && state.players.every(player => player.hand.length === 0)) {
-    return 'Næste runde';
-  }
-  if (state.trickCards.length === 0) return 'Fortsæt';
-  if (state.players[0].hand.length === 1) return 'Spil sidste kort';
-  return 'Næste stik';
+  if (state.players.every(player => player.hand.length === 0)) return 'Næste runde';
+  if (state.players.every(player => player.hand.length === 1)) return 'Spil sidste kort';
+  return 'Fortsæt';
 }
 
 function renderCard(card) {
@@ -551,11 +539,11 @@ function renderCard(card) {
 }
 
 function turnHintFor(player) {
-  if (state.currentHighestValue === null) return 'Du starter stikket. Vælg et kort.';
+  if (state.topCardValue === null) return 'Du starter bunken. Vælg et kort.';
 
-  const canBeat = player.hand.some(card => card.value >= state.currentHighestValue);
-  if (canBeat) return `Du skal lægge ${valueName(state.currentHighestValue)} eller højere.`;
-  return 'Du kan ikke stikke og skal smide dit laveste kort.';
+  const canBeatTopCard = player.hand.some(card => card.value >= state.topCardValue);
+  if (canBeatTopCard) return `Du skal lægge ${valueName(state.topCardValue)} eller højere, fordi det er øverste kort i bunken.`;
+  return `Du kan ikke matche/stikke ${valueName(state.topCardValue)} og skal smide dit laveste kort. Det kort bliver nu øverste kort for næste spiller.`;
 }
 
 function playerName(playerId) {
