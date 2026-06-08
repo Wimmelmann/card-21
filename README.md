@@ -2,6 +2,8 @@
 
 En GitHub-klar prototype af kortspillet **21**, også kendt som **Agurk**.
 
+Version: v3
+
 ## Regler i appen
 
 - 2–4 spillere.
@@ -23,12 +25,14 @@ En GitHub-klar prototype af kortspillet **21**, også kendt som **Agurk**.
 
 Den simple computer-AI spiller ikke længere kun laveste lovlige kort. Den forsøger nu også at:
 
+- beskytte esser meget hårdt og kun smide dem frivilligt, hvis der ikke er andre lovlige valg,
 - gemme lave kort til slutningen,
+- åbne stik med mellem-kort frem for esser,
 - komme af med farlige høje kort tæt på slutningen,
 - bruge knægt/dame/konge til at presse næste spiller,
 - spille laveste kort der kan stikke, når der ikke er en god taktisk grund til at spille højere.
 
-AI'en er stadig enkel og kan forbedres senere.
+AI'en er stadig enkel og kan forbedres senere, men den bør nu ikke længere åbne eller stikke med es, medmindre den er tvunget eller kun har es tilbage.
 
 ## Sådan kører du appen lokalt
 

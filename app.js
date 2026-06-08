@@ -209,24 +209,52 @@ function chooseRecommendedCard(player) {
   const highCards = player.hand.filter(card => card.value >= 11).sort(sortCards);
   const nextPlayer = state.players[(state.currentPlayerIndex + 1) % state.players.length];
   const endgame = handSize <= 3;
+  const nonAces = playable.filter(card => card.value > 1).sort(sortCards);
 
-  // Starter man et stik tæt på slutningen, er det ofte klogt at smide et farligt højt kort
-  // så man kan gemme et lavere kort til sidste afgørelse.
+  // Esser er guld i Agurk. AI'en må kun frivilligt bruge et es,
+  // hvis den ikke har andre lovlige kort. Ellers gemmes esset til slut.
+  const lowestNonAce = nonAces[0] || lowest;
+
+  // Starter man et stik, skal AI'en især undgå at åbne med es.
+  // Den spiller hellere et mellem/højt kort og prøver at gemme de helt lave kort.
   if (state.currentHighestValue === null) {
     if (handSize === 1) return player.hand[0];
-    if (endgame && highCards.length > 0 && lowCards > 0) return highCards[highCards.length - 1];
-    if (endgame) return highest;
+
+    const middleCards = playable.filter(card => card.value >= 6 && card.value <= 10).sort(sortCards);
+    const nonProtectedCards = playable.filter(card => card.value >= 6).sort(sortCards);
+    const smallButNotAce = playable.filter(card => card.value > 1 && card.value <= 5).sort(sortCards);
+
+    // Tæt på slutningen: kom af med farlige kort og gem lave kort til sidste afgørelse.
+    if (endgame) {
+      const dangerousCards = playable.filter(card => card.value >= 10).sort(sortCards);
+      if (dangerousCards.length > 0 && lowCards > 0) return dangerousCards[dangerousCards.length - 1];
+      if (nonAces.length > 0) return nonAces[nonAces.length - 1];
+      return lowest;
+    }
+
+    // Tidligt/midt i runden: brug et mellem-kort først, hvis muligt.
+    if (middleCards.length > 0) return middleCards[0];
+
+    // Har AI'en flere høje kort og samtidig lave kort i reserve, må den smide ét højt kort.
     if (highCards.length >= 2 && lowCards >= 2) return highCards[0];
-    return lowest;
+
+    // Ellers vælg laveste ikke-beskyttede kort. Es spilles kun, hvis det er eneste mulighed.
+    if (nonProtectedCards.length > 0) return nonProtectedCards[0];
+    if (smallButNotAce.length > 0) return smallButNotAce[smallButNotAce.length - 1];
+    return lowestNonAce;
   }
 
   const beatingCards = playable.filter(card => card.value >= state.currentHighestValue).sort(sortCards);
 
   // Hvis man ikke kan stikke, er reglen tvungen: smid laveste kort.
+  // Det er den eneste situation, hvor AI'en gerne må smide es frivilligt-lignende.
   if (beatingCards.length === 0) return lowest;
 
-  const lowestBeating = beatingCards[0];
-  const pressureCards = beatingCards.filter(card => card.value >= 11).sort(sortCards);
+  // Kan AI'en stikke uden at bruge es, vælger den aldrig es.
+  const nonAceBeatingCards = beatingCards.filter(card => card.value > 1).sort(sortCards);
+  const safeBeatingCards = nonAceBeatingCards.length > 0 ? nonAceBeatingCards : beatingCards;
+  const lowestBeating = safeBeatingCards[0];
+  const pressureCards = safeBeatingCards.filter(card => card.value >= 11).sort(sortCards);
   const canApplyPressure = pressureCards.length > 0
     && state.currentHighestValue <= 11
     && nextPlayer
@@ -240,11 +268,12 @@ function chooseRecommendedCard(player) {
 
   // Sidst i runden skal man helst af med høje kort, hvis man stadig kan gøre det lovligt.
   if (endgame && highCards.length > 0) {
-    const dangerousPlayable = beatingCards.filter(card => card.value >= 10).sort(sortCards);
+    const dangerousPlayable = safeBeatingCards.filter(card => card.value >= 10).sort(sortCards);
     if (dangerousPlayable.length > 0) return dangerousPlayable[dangerousPlayable.length - 1];
   }
 
-  // Standard: brug laveste kort, der kan stikke, for at spare stærkere kort.
+  // Standard: brug laveste ikke-es, der kan stikke, for at spare de stærkere kort
+  // og samtidig beskytte de allermindste kort til slutningen.
   return lowestBeating;
 }
 
