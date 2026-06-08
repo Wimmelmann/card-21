@@ -1,74 +1,195 @@
-# 21 / Agurk
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>21 / Agurk</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-card-back="red" data-felt="green">
+  <div class="app-shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Kortspil</p>
+        <h1>21 / Agurk</h1>
+        <p class="subtitle">Spil lokalt mod venner eller computer-spillere.</p>
+      </div>
+      <button id="rulesBtn" class="ghost-btn">Regler</button>
+    </header>
 
-En GitHub-klar prototype af kortspillet **21**, også kendt som **Agurk**.
+    <main>
+      <section id="setupView" class="panel setup-panel">
+        <div class="setup-head">
+          <div>
+            <h2>Start nyt spil</h2>
+            <p class="hint">Første runde starter med 7 kort. Herefter styrer taberkortet næste runde, max 10 kort.</p>
+          </div>
+          <div class="card-back-preview" aria-hidden="true"></div>
+        </div>
 
-Version: v6
+        <div class="setup-grid">
+          <label>
+            Antal spillere
+            <select id="playerCount">
+              <option value="2">2 spillere</option>
+              <option value="3">3 spillere</option>
+              <option value="4" selected>4 spillere</option>
+            </select>
+          </label>
+          <label>
+            Pointregel
+            <select id="pointLimit">
+              <option value="21" selected>Over 21 taber · præcis 21 nulstiller</option>
+            </select>
+          </label>
+        </div>
 
-## Regler i appen
+        <div id="playerSetup" class="player-setup"></div>
 
-- 2–4 spillere.
-- Første runde gives 7 kort til hver spiller.
-- Es er lavest, konge er højest.
-- Kulør har ingen betydning.
-- Alle spillere lægger kort oven på hinanden i én bunke.
-- Det er altid det **øverste kort**, der skal matches eller stikkes.
-- Næste spiller skal lægge samme eller højere kort end øverste kort, hvis det er muligt.
-- Kan spilleren ikke matche/stikke, skal spilleren smide sit laveste kort.
-- Når en spiller smider et lavt kort, bliver det kort det nye øverste kort, og næste spiller skal kun matche/stikke det nye øverste kort.
-- Eksempel: Spiller 1 lægger 8. Spiller 2 kan ikke stikke og lægger 2. Spiller 3 skal nu kun lægge 2 eller højere.
-- En runde varer fra kortgivning til sidste kort – ikke kun én rundgang af spillere.
-- Når alle sidder med ét kort tilbage, spilles sidste kort, og sidste kort afgør runden.
-- Højeste sidste kort taber.
-- Hvis flere spillere har samme højeste sidste kort, taber de alle og får strafpoint.
-- Taberkortets fulde værdi gives som strafpoint.
-- Taberkortets værdi bestemmer kortantal i næste runde, dog max 10 kort.
-- Det gælder om **ikke** at få point.
-- Kommer en spiller over 21 point, har spilleren tabt.
-- Rammer en spiller præcis 21 point, nulstilles pointbunken til 0.
+        <h3>Udseende og lyd</h3>
+        <div class="setup-grid options-grid">
+          <label>
+            Lyd
+            <select id="soundSetting">
+              <option value="on" selected>Til</option>
+              <option value="off">Fra</option>
+            </select>
+          </label>
+          <label>
+            Kortbagside
+            <select id="cardBackSelect">
+              <option value="red" selected>Klassisk rød</option>
+              <option value="blue">Blå</option>
+              <option value="blackGold">Sort/guld</option>
+              <option value="green">Grøn</option>
+            </select>
+          </label>
+          <label>
+            Filttæppe
+            <select id="feltSelect">
+              <option value="green" selected>Mørkegrøn</option>
+              <option value="blue">Blå</option>
+              <option value="bordeaux">Bordeaux</option>
+              <option value="black">Sort</option>
+            </select>
+          </label>
+        </div>
 
-## Rettet i v6
+        <button id="startGameBtn" class="primary-btn wide">Start spil</button>
+      </section>
 
-- UI'et viser nu bunken som en egentlig kortstak i midten i stedet for en række kort.
-- Teksten “Fælles bunke” er fjernet fra bordet, så det forklares visuelt i stedet.
-- “Næste runde: Afgøres af taberkort” er fjernet.
-- Næste rundes kortantal vises først tydeligt, når runden faktisk er afgjort.
-- Efter en rundeslut vises et stort resultatfelt med fx “5 kort til hver spiller”.
-- Scorepanelet viser “—” for næste runde, indtil kortantallet er kendt.
+      <section id="gameView" class="game-view hidden">
+        <section class="table-wrap panel">
+          <div class="table-toolbar">
+            <div>
+              <p id="roundLabel" class="eyebrow">Runde 1</p>
+              <h2 id="turnTitle">Din tur</h2>
+              <p id="turnHint" class="hint">Vælg et kort.</p>
+            </div>
+            <div class="toolbar-actions">
+              <button id="settingsBtn" class="ghost-btn small">Indstillinger</button>
+              <button id="newGameBtn" class="ghost-btn small">Nyt spil</button>
+            </div>
+          </div>
 
-## Taktik i denne version
+          <div id="tableBoard" class="table-board">
+            <div id="seatLayer" class="seat-layer"></div>
 
-Den simple computer-AI forsøger at:
+            <div class="center-readout">
+              <span>Øverste kort</span>
+              <strong id="currentTopCard">-</strong>
+            </div>
 
-- beskytte esser meget hårdt og kun smide dem frivilligt, hvis der ikke er andre lovlige valg,
-- gemme lave kort til slutningen,
-- åbne bunken med mellem-kort frem for esser,
-- komme af med farlige høje kort tæt på slutningen,
-- bruge knægt/dame/konge til at presse næste spiller,
-- spille laveste kort der kan matche/stikke, når der ikke er en god taktisk grund til at spille højere.
+            <div id="pileZone" class="pile-zone"></div>
+            <div id="finalReveal" class="final-reveal hidden"></div>
+            <div id="roundResult" class="round-result hidden"></div>
+          </div>
 
-AI'en er stadig enkel og kan forbedres senere.
+          <div class="hand-area">
+            <div class="hand-title-row">
+              <h3 id="handTitle">Din hånd</h3>
+              <span id="handCount" class="pill"></span>
+            </div>
+            <div id="handCards" class="hand-cards"></div>
+          </div>
 
-## Sådan kører du appen lokalt
+          <div class="controls">
+            <button id="autoPlayBtn" class="secondary-btn">Spil anbefalet kort</button>
+            <button id="continueBtn" class="primary-btn hidden">Fortsæt</button>
+          </div>
+        </section>
 
-Åbn `index.html` direkte i en browser.
+        <aside class="side-panel">
+          <section class="panel status-panel">
+            <h2>Spilstatus</h2>
+            <div class="status-list">
+              <div><span>Denne runde</span><strong id="cardsThisRound">7 kort</strong></div>
+              <div><span>Næste runde</span><strong id="nextRoundInfo">—</strong></div>
+              <div><span>Bunken</span><strong id="pileCount">0 kort</strong></div>
+            </div>
+          </section>
 
-## Sådan lægger du den på GitHub Pages
+          <section id="settingsPanel" class="panel settings-panel hidden">
+            <h2>Indstillinger</h2>
+            <label>
+              Lyd
+              <select id="soundSettingGame">
+                <option value="on">Til</option>
+                <option value="off">Fra</option>
+              </select>
+            </label>
+            <label>
+              Kortbagside
+              <select id="cardBackSelectGame">
+                <option value="red">Klassisk rød</option>
+                <option value="blue">Blå</option>
+                <option value="blackGold">Sort/guld</option>
+                <option value="green">Grøn</option>
+              </select>
+            </label>
+            <label>
+              Filttæppe
+              <select id="feltSelectGame">
+                <option value="green">Mørkegrøn</option>
+                <option value="blue">Blå</option>
+                <option value="bordeaux">Bordeaux</option>
+                <option value="black">Sort</option>
+              </select>
+            </label>
+          </section>
 
-1. Opret et nyt repository på GitHub, fx `21-agurk`.
-2. Upload disse filer:
-   - `index.html`
-   - `styles.css`
-   - `app.js`
-   - `README.md`
-3. Gå til **Settings → Pages**.
-4. Vælg branch `main` og folder `/root`.
-5. Gem. Efter kort tid får du et link til appen.
+          <section class="panel log-panel">
+            <h2>Rundelog</h2>
+            <p class="hint small-text">Almindelige spillede kort gemmes ikke i loggen. Det skal man selv huske.</p>
+            <div id="logList" class="log-list"></div>
+          </section>
+        </aside>
+      </section>
+    </main>
+  </div>
 
-## Næste mulige features
+  <dialog id="rulesDialog">
+    <div class="dialog-content">
+      <button id="closeRulesBtn" class="close-btn">×</button>
+      <h2>Regler i denne app</h2>
+      <ul>
+        <li>2–4 spillere. Kulør betyder ingenting.</li>
+        <li>Es er lavest. Konge er højest.</li>
+        <li>Første runde spilles med 7 kort til hver.</li>
+        <li>Alle spiller i én bunke. Man skal lægge samme eller højere værdi end det øverste kort, hvis man kan.</li>
+        <li>Kan man ikke matche eller stikke øverste kort, skal man smide sit laveste kort. Det kort bliver det nye øverste kort.</li>
+        <li>En runde er hele hånden fra kortgivning til sidste kort – ikke kun én rundgang.</li>
+        <li>Når alle sidder med ét kort til sidst, spilles sidste kort, og højeste sidste kort taber runden.</li>
+        <li>Hvis flere har samme højeste sidste kort, taber de alle og beholder hver deres kort.</li>
+        <li>Taberkortets fulde værdi gives som strafpoint.</li>
+        <li>Næste runde får alle kort svarende til taberkortet, dog højst 10 kort.</li>
+        <li>Det gælder om ikke at få point. Kommer en spiller over 21, er spillet slut.</li>
+        <li>Rammer en spiller præcis 21, nulstilles pointbunken til 0.</li>
+        <li>Taktik: lave kort er gode at gemme til sidst, men høje kort kan bruges til at presse næste spiller.</li>
+      </ul>
+    </div>
+  </dialog>
 
-- Sværhedsgrader for AI.
-- Bedre visning af hvorfor AI vælger et kort.
-- Mobiloptimeret kort-animation.
-- Gem spil i browseren.
-- Online multiplayer med gamecode.
-- Lyd og vibration ved vigtige spilhandlinger.
+  <script src="app.js"></script>
+</body>
+</html>
