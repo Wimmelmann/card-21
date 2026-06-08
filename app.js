@@ -26,6 +26,8 @@ const state = {
   deck: [],
   roundNumber: 1,
   cardsPerPlayer: 7,
+  nextRoundCards: null,
+  lastRoundResult: null,
   pointLimit: 21,
   currentPlayerIndex: 0,
   roundStarterIndex: 0,
@@ -51,6 +53,7 @@ const els = {
   turnTitle: document.querySelector('#turnTitle'),
   turnHint: document.querySelector('#turnHint'),
   currentHighest: document.querySelector('#currentHighest'),
+  roundResult: document.querySelector('#roundResult'),
   trickCards: document.querySelector('#trickCards'),
   handTitle: document.querySelector('#handTitle'),
   handCards: document.querySelector('#handCards'),
@@ -119,6 +122,8 @@ function startGame() {
   state.pointLimit = Number(els.pointLimit.value);
   state.roundNumber = 1;
   state.cardsPerPlayer = 7;
+  state.nextRoundCards = null;
+  state.lastRoundResult = null;
   state.currentPlayerIndex = 0;
   state.roundStarterIndex = 0;
   state.gameOver = false;
@@ -138,6 +143,11 @@ function resetToSetup() {
 }
 
 function startRound() {
+  if (state.nextRoundCards !== null) {
+    state.cardsPerPlayer = state.nextRoundCards;
+  }
+  state.nextRoundCards = null;
+  state.lastRoundResult = null;
   state.deck = shuffle(createDeck());
   state.pileCards = [];
   state.topCardValue = null;
@@ -149,7 +159,7 @@ function startRound() {
   }
 
   state.currentPlayerIndex = state.roundStarterIndex % state.players.length;
-  addLog(`Runde ${state.roundNumber}: Alle får ${state.cardsPerPlayer} kort. Alle kort spilles i én fælles bunke. Man skal kun matche eller stikke det øverste kort.`, true);
+  addLog(`Runde ${state.roundNumber}: Alle får ${state.cardsPerPlayer} kort. Alle kort lægges oven på hinanden. Man skal kun matche eller stikke det øverste kort.`, true);
 
   if (state.finalPhase) {
     addLog('Alle har kun ét kort. Denne runde afgøres direkte på sidste kort.', true);
@@ -365,7 +375,16 @@ function finishRound() {
     addLog(`${resetPlayers.join(', ')} rammer præcis ${state.pointLimit} og nulstiller pointbunken til 0.`, true);
   }
 
-  state.cardsPerPlayer = Math.min(highestValue, 10);
+  state.nextRoundCards = Math.min(highestValue, 10);
+  state.lastRoundResult = {
+    loserNames,
+    highestValue,
+    nextCards: state.nextRoundCards,
+    capped: highestValue > 10,
+    finalSummary,
+  };
+  addLog(`Næste runde: ${state.nextRoundCards} kort til hver spiller${highestValue > 10 ? ' (loft på 10)' : ''}.`, true);
+
   state.roundStarterIndex = state.players.findIndex(player => player.id === losers[0].playerId);
   const busted = state.players.filter(player => player.score > state.pointLimit);
 
@@ -427,7 +446,13 @@ function renderScores() {
   }
 
   els.cardsThisRound.textContent = `${state.cardsPerPlayer} kort`;
-  els.nextRoundInfo.textContent = state.gameOver ? 'Spillet er slut' : 'Afgøres af taberkort';
+  if (state.gameOver) {
+    els.nextRoundInfo.textContent = 'Spillet er slut';
+  } else if (state.nextRoundCards !== null) {
+    els.nextRoundInfo.textContent = `${state.nextRoundCards} kort`;
+  } else {
+    els.nextRoundInfo.textContent = '—';
+  }
 }
 
 function renderTable() {
@@ -447,31 +472,68 @@ function renderTable() {
     els.turnHint.textContent = turnHintFor(player);
   }
 
+  renderRoundResult();
   els.currentHighest.textContent = state.topCardValue === null ? '-' : valueName(state.topCardValue);
-  els.trickCards.innerHTML = '';
+  renderPile();
+}
 
-  if (state.pileCards.length === 0) {
-    els.trickCards.innerHTML = '<p class="hint">Ingen kort i bunken endnu.</p>';
+function renderRoundResult() {
+  if (!state.lastRoundResult || !state.awaitingContinue || !state.players.every(player => player.hand.length === 0)) {
+    els.roundResult.classList.add('hidden');
+    els.roundResult.innerHTML = '';
     return;
   }
 
-  const cardsToShow = state.pileCards.slice(-16);
-  if (state.pileCards.length > cardsToShow.length) {
-    const hidden = document.createElement('p');
-    hidden.className = 'hint';
-    hidden.textContent = `${state.pileCards.length - cardsToShow.length} tidligere kort er skjult. De nyeste kort vises her.`;
-    els.trickCards.appendChild(hidden);
+  const result = state.lastRoundResult;
+  els.roundResult.classList.remove('hidden');
+  els.roundResult.innerHTML = `
+    <span>Runden er færdig · ${escapeHtml(result.loserNames)} tabte med ${escapeHtml(valueName(result.highestValue))}</span>
+    <strong>${result.nextCards} kort til hver spiller</strong>
+    <span>${result.capped ? 'Taberkortet var over 10, så loftet på 10 bruges.' : 'Taberkortet bestemmer kortantallet.'}</span>
+  `;
+}
+
+function renderPile() {
+  els.trickCards.innerHTML = '';
+  els.trickCards.classList.toggle('empty', state.pileCards.length === 0);
+
+  if (state.pileCards.length === 0) {
+    els.trickCards.innerHTML = '<p class="hint">Ingen kort endnu.</p>';
+    return;
   }
 
-  for (const entry of cardsToShow) {
+  const visual = document.createElement('div');
+  visual.className = 'pile-visual';
+  const cardsToShow = state.pileCards.slice(-5);
+  const offsets = [
+    { x: -30, y: -6, r: -9 },
+    { x: -16, y: -1, r: -5 },
+    { x: 0, y: 4, r: 0 },
+    { x: 16, y: 9, r: 5 },
+    { x: 30, y: 14, r: 9 },
+  ];
+  const startOffset = offsets.length - cardsToShow.length;
+
+  cardsToShow.forEach((entry, index) => {
+    const offset = offsets[startOffset + index];
     const wrap = document.createElement('div');
+    wrap.className = `pile-card-wrap ${index === cardsToShow.length - 1 ? 'top' : ''}`;
+    wrap.style.transform = `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px)) rotate(${offset.r}deg)`;
+    wrap.style.zIndex = String(index + 1);
     wrap.appendChild(renderCard(entry.card));
-    const owner = document.createElement('span');
-    owner.className = 'card-owner';
-    owner.textContent = entry.wasFinalCard ? `${playerName(entry.playerId)} · sidste` : playerName(entry.playerId);
-    wrap.querySelector('.playing-card').appendChild(owner);
-    els.trickCards.appendChild(wrap);
-  }
+    visual.appendChild(wrap);
+  });
+
+  const topEntry = state.pileCards[state.pileCards.length - 1];
+  const meta = document.createElement('div');
+  meta.className = 'pile-meta';
+  meta.innerHTML = `
+    <span><strong>${state.pileCards.length}</strong> kort i bunken</span>
+    <span>Øverst: <strong>${escapeHtml(cardName(topEntry.card))}</strong> · ${escapeHtml(playerName(topEntry.playerId))}</span>
+  `;
+
+  els.trickCards.appendChild(visual);
+  els.trickCards.appendChild(meta);
 }
 
 function renderHand() {

@@ -56,7 +56,7 @@
             </div>
             <div>
               <span>Næste runde</span>
-              <strong id="nextRoundInfo">Afgøres af taberkort</strong>
+              <strong id="nextRoundInfo">—</strong>
             </div>
           </div>
         </aside>
@@ -74,9 +74,10 @@
             </div>
           </div>
 
+          <div id="roundResult" class="round-result hidden"></div>
+
           <div class="trick-table">
-            <h3>Fælles bunke</h3>
-            <div id="trickCards" class="trick-cards"></div>
+            <div id="trickCards" class="trick-cards pile-stage"></div>
           </div>
 
           <div class="hand-area">
@@ -106,8 +107,8 @@
         <li>2–4 spillere. Kulør betyder ingenting.</li>
         <li>Es er lavest. Konge er højest.</li>
         <li>Første runde spilles med 7 kort til hver.</li>
-        <li>Alle spiller i én fælles bunke. Man skal lægge samme eller højere værdi end det øverste kort i bunken, hvis man kan.</li>
-        <li>Kan man ikke matche eller stikke øverste kort, skal man smide sit laveste kort. Det kort bliver nu det nye øverste kort for næste spiller.</li>
+        <li>Alle spiller i én bunke. Man skal lægge samme eller højere værdi end det øverste kort, hvis man kan.</li>
+        <li>Kan man ikke matche eller stikke øverste kort, skal man smide sit laveste kort. Det kort bliver det nye øverste kort for næste spiller.</li>
         <li>En runde er hele hånden fra kortgivning til sidste kort – ikke kun én rundgang.</li>
                 <li>Når alle sidder med ét kort til sidst, spilles sidste kort, og højeste sidste kort taber runden.</li>
         <li>Hvis flere har samme højeste sidste kort, taber de alle og beholder hver deres kort.</li>

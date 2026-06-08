@@ -2,7 +2,7 @@
 
 En GitHub-klar prototype af kortspillet **21**, også kendt som **Agurk**.
 
-Version: v5
+Version: v6
 
 ## Regler i appen
 
@@ -10,8 +10,8 @@ Version: v5
 - Første runde gives 7 kort til hver spiller.
 - Es er lavest, konge er højest.
 - Kulør har ingen betydning.
-- Alle spillere spiller deres kort i én fælles bunke.
-- Det er altid det **øverste kort i bunken**, der skal matches eller stikkes.
+- Alle spillere lægger kort oven på hinanden i én bunke.
+- Det er altid det **øverste kort**, der skal matches eller stikkes.
 - Næste spiller skal lægge samme eller højere kort end øverste kort, hvis det er muligt.
 - Kan spilleren ikke matche/stikke, skal spilleren smide sit laveste kort.
 - Når en spiller smider et lavt kort, bliver det kort det nye øverste kort, og næste spiller skal kun matche/stikke det nye øverste kort.
@@ -26,13 +26,14 @@ Version: v5
 - Kommer en spiller over 21 point, har spilleren tabt.
 - Rammer en spiller præcis 21 point, nulstilles pointbunken til 0.
 
-## Rettet i v5
+## Rettet i v6
 
-- Appen bruger nu én løbende fælles bunke gennem hele runden.
-- Kravet for næste spiller er nu altid det senest spillede/øverste kort, ikke højeste kort tidligere i runden.
-- Hvis en spiller ikke kan stikke og smider fx en 2'er, skal næste spiller kun matche/stikke 2'eren.
-- UI er ændret fra “Skal stikkes” til “Øverste kort”.
-- Regelvinduet og spilloggen er opdateret til den nye bunke-logik.
+- UI'et viser nu bunken som en egentlig kortstak i midten i stedet for en række kort.
+- Teksten “Fælles bunke” er fjernet fra bordet, så det forklares visuelt i stedet.
+- “Næste runde: Afgøres af taberkort” er fjernet.
+- Næste rundes kortantal vises først tydeligt, når runden faktisk er afgjort.
+- Efter en rundeslut vises et stort resultatfelt med fx “5 kort til hver spiller”.
+- Scorepanelet viser “—” for næste runde, indtil kortantallet er kendt.
 
 ## Taktik i denne version
 
